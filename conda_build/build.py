@@ -489,20 +489,7 @@ can lead to packages that include their dependencies.""" %
     else:
         print("STOPPING BUILD BEFORE POST:", m.dist())
 
-
-def test(m, verbose=True, channel_urls=(), override_channels=False):
-    '''
-    Execute any test scripts for the given package.
-
-    :param m: Package's metadata.
-    :type m: Metadata
-    '''
-    # remove from package cache
-    rm_pkgs_cache(m.dist())
-
-    tmp_dir = join(config.croot, 'test-tmp_dir')
-    rm_rf(tmp_dir)
-    os.makedirs(tmp_dir)
+def create_test_files(m, tmp_dir):
     create_files(tmp_dir, m)
     # Make Perl or Python-specific test files
     if m.name().startswith('perl-'):
@@ -512,19 +499,11 @@ def test(m, verbose=True, channel_urls=(), override_channels=False):
         py_files = create_py_files(tmp_dir, m)
         pl_files = False
     shell_files = create_shell_files(tmp_dir, m)
-    if not (py_files or shell_files or pl_files):
-        print("Nothing to test for:", m.dist())
-        return
 
-    print("TEST START:", m.dist())
-    if on_win:
-        if isdir(config.build_prefix):
-            move_to_trash(config.build_prefix, '')
-        if isdir(config.test_prefix):
-            move_to_trash(config.test_prefix, '')
-    else:
-        rm_rf(config.build_prefix)
-        rm_rf(config.test_prefix)
+    return py_files, pl_files, shell_files
+
+def set_up_test_env(m, py_files, pl_files, verbose=True, channel_urls=(), override_channels=False):
+
     specs = ['%s %s %s' % (m.name(), m.version(), m.build_id())]
 
     # add packages listed in test/requires
@@ -555,6 +534,13 @@ def test(m, verbose=True, channel_urls=(), override_channels=False):
 
     # Python 2 Windows requires that envs variables be string, not unicode
     env = {str(key): str(value) for key, value in env.items()}
+
+    return env
+
+def run_smth(env):
+    subprocess.check_call(['which', config.test_python])
+
+def run_tests(m, env, tmp_dir, py_files, pl_files, shell_files):
     if py_files:
         try:
             subprocess.check_call([config.test_python, '-s',
@@ -588,7 +574,38 @@ def test(m, verbose=True, channel_urls=(), override_channels=False):
             except subprocess.CalledProcessError:
                 tests_failed(m)
 
-    print("TEST END:", m.dist())
+def test(m, verbose=True, channel_urls=(), override_channels=False):
+    '''
+    Execute any test scripts for the given package.
+
+    :param m: Package's metadata.
+    :type m: Metadata
+    '''
+    # remove from package cache
+    rm_pkgs_cache(m.dist())
+
+    tmp_dir = join(config.croot, 'test-tmp_dir')
+    rm_rf(tmp_dir)
+    os.makedirs(tmp_dir)
+
+    py_files, pl_files, shell_files = create_test_files(m, tmp_dir)
+    if not (py_files or shell_files or pl_files):
+        print("Nothing to test for:", m.dist())
+        return
+
+    if on_win:
+        if isdir(config.build_prefix):
+            move_to_trash(config.build_prefix, '')
+        if isdir(config.test_prefix):
+            move_to_trash(config.test_prefix, '')
+    else:
+        rm_rf(config.build_prefix)
+        rm_rf(config.test_prefix)
+
+    env = set_up_test_env(m, py_files, pl_files, verbose=True, channel_urls=(), override_channels=False)
+    run_tests(m, env, tmp_dir, py_files, pl_files, shell_files)
+
+    print("TEST END:", m.dist())   
 
 def tests_failed(m):
     '''
