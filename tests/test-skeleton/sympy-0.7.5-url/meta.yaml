@@ -155,8 +155,9 @@ test:
 about:
   home: http://code.google.com/p/sympy
   license: BSD License
+  license_family: BSD
   summary: 'Computer algebra system (CAS) in Python'
 
 # See
-# http://docs.continuum.io/conda/build.html for
+# https://docs.conda.io/projects/conda-build for
 # more information about meta.yaml

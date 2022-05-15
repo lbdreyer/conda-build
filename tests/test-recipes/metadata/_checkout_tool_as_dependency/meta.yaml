@@ -1,0 +1,20 @@
+{% set recipe_dir = RECIPE_DIR if unix else "/" ~ RECIPE_DIR.replace("\\", "/") %}
+
+package:
+  name: test-checkout-tool-as-dependency
+  version: 1.0
+
+source:
+  svn_url: https://github.com/conda/conda_build_test_recipe.git
+  svn_rev: 1
+
+requirements:
+  build:
+    # To test the conda_build version
+    - svn
+    - vc 9   # [win and py2k]
+    - vc 14   # [win and py3k]
+  # This is here so that we get a smaller host prefix to speed up
+  # the excruciatingly slow calls to prefix_files (os.walk).
+  host:
+    - bzip2

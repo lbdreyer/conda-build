@@ -3,6 +3,23 @@
 *.egg-info
 build/
 dist/
+docs/_build
 docs/build
 tags
 .idea/
+MANIFEST
+ve
+venv
+junit.xml
+.cache
+.DS_Store
+.pytest_cache/
+.asv
+prof
+relative
+
+
+# Rever
+rever/
+**/.vscode
+**/_build

@@ -4,9 +4,11 @@ conda_build/noarch_python.py.
 
 """
 import os
+from os.path import dirname, exists, isdir, join, normpath
+import re
 import sys
 import shutil
-from os.path import dirname, exists, isdir, join, normpath
+
 
 # Silence pyflakes. This variable is added when link.py is written by
 # conda_build.noarch_python.
@@ -24,6 +26,13 @@ else:
 
 # the list of these files is going to be store in info/_files
 FILES = []
+
+# three capture groups: whole_shebang, executable, options
+SHEBANG_REGEX = (br'^(#!'  # pretty much the whole match string
+                 br'(?:[ ]*)'  # allow spaces between #! and beginning of the executable path
+                 br'(/(?:\\ |[^ \n\r\t])*)'  # the executable is the next text block without an escaped space or non-space whitespace character  # NOQA
+                 br'(.*)'  # the rest of the line can contain option flags
+                 br')$')  # end whole_shebang group
 
 
 def _link(src, dst):
@@ -59,29 +68,47 @@ def link_files(src_root, dst_root, files):
         if exists(dst):
             _unlink(dst)
         _link(src, dst)
-        f = '%s/%s' % (dst_root, f)
+        f = f'{dst_root}/{f}'
         FILES.append(f)
         if f.endswith('.py'):
             FILES.append(pyc_f(f))
+
+
+# yanked from conda
+def replace_long_shebang(data):
+    # this function only changes a shebang line if it exists and is greater than 127 characters
+    if hasattr(data, 'encode'):
+        data = data.encode()
+    shebang_match = re.match(SHEBANG_REGEX, data, re.MULTILINE)
+    if shebang_match:
+        whole_shebang, executable, options = shebang_match.groups()
+        if len(whole_shebang) > 127:
+            executable_name = executable.decode('utf-8').split('/')[-1]
+            new_shebang = '#!/usr/bin/env {}{}'.format(executable_name, options.decode('utf-8'))
+            data = data.replace(whole_shebang, new_shebang.encode('utf-8'))
+    if hasattr(data, 'decode'):
+        data = data.decode()
+    return data
 
 
 def create_script(fn):
     src = join(THIS_DIR, 'python-scripts', fn)
     dst = join(BIN_DIR, fn)
     if sys.platform == 'win32':
-        shutil.copyfile(src, dst + '-script.py')
+        shutil.copy2(src, dst + '-script.py')
         FILES.append('Scripts/%s-script.py' % fn)
-        shutil.copyfile(join(THIS_DIR,
-                             'cli-%d.exe' % (8 * tuple.__itemsize__)),
-                        dst + '.exe')
+        shutil.copy2(join(THIS_DIR,
+                          'cli-%d.exe' % (8 * tuple.__itemsize__)),
+                     dst + '.exe')
         FILES.append('Scripts/%s.exe' % fn)
     else:
         with open(src) as fi:
             data = fi.read()
         with open(dst, 'w') as fo:
-            fo.write('#!%s\n' % normpath(sys.executable))
+            shebang = replace_long_shebang('#!%s\n' % normpath(sys.executable))
+            fo.write(shebang)
             fo.write(data)
-        os.chmod(dst, 0o755)
+        os.chmod(dst, 0o775)
         FILES.append('bin/%s' % fn)
 
 

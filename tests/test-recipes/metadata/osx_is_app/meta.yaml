@@ -3,7 +3,7 @@ package:
   version: 1.0
 
 source:
-  git_url: ../../../../
+  path: ../../../../../conda_build_test_recipe
 
 build:
   entry_points:
@@ -14,6 +14,9 @@ build:
 requirements:
   build:
     - python
+    - setuptools
   run:
     - python
     - python.app
+    # pkg_resources used; needs setuptools
+    - setuptools
